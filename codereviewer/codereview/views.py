@@ -1,3 +1,10 @@
+from rest_framework.permissions import AllowAny
+from rest_framework.decorators import api_view, permission_classes
+from django.contrib.auth import authenticate
+from rest_framework.response import Response
+from django.contrib.auth import authenticate, login
+from django.contrib.auth.models import User
+from rest_framework.decorators import api_view
 from django.shortcuts import render
 
 # Create your views here.
@@ -6,6 +13,10 @@ import gradio as gr
 from django.shortcuts import render, redirect
 from django.contrib.auth import login, authenticate
 from .forms import CustomUserCreationForm
+from django.contrib.auth import authenticate, login
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 
 def basic_code_review(code: str) -> str:
@@ -61,17 +72,27 @@ def gradio_interface(request):
 
     return render(request, 'interface.html')
 
-def signup_view(request):
-    if request.method == 'POST':
-        form = CustomUserCreationForm(request.POST)
-        if form.is_valid():
-            form.save()
-            username = form.cleaned_data.get('username')
-            raw_password = form.cleaned_data.get('password1')
-            user = authenticate(username=username, password=raw_password)
-            login(request, user)
-            return redirect('gradio_interface')
 
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def signup(request):
+    username = request.data.get('username')
+    password = request.data.get('password')
+    if not User.objects.filter(username=username).exists():
+        User.objects.create_user(username, password=password)
+        return Response({'status': 'signup successful'}, status=200)
     else:
-        form = CustomUserCreationForm()
-    return render(request, 'signup.html', {'form': form})
+        return Response({'status': 'username already exists'}, status=400)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def login(request):
+    username = request.data.get('username')
+    password = request.data.get('password')
+    user = authenticate(username=username, password=password)
+    if user:
+        # you can also use JWT for authentication here
+        return Response({'status': 'login successful'}, status=200)
+    else:
+        return Response({'status': 'invalid credentials'}, status=400)
